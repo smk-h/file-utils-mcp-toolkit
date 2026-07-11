@@ -16,6 +16,8 @@
     "pack:tgz": "npm pack",
     "pack:list": "node scripts/pack-list.mjs",
     "git-sync-force": "node scripts/sync-force.mjs",
+    "inspector": "npm run inspector:win",
+    "inspector:win": "powershell -ExecutionPolicy Bypass -File scripts/run-inspector.ps1",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "files": [
@@ -37,6 +39,7 @@
   },
   "devDependencies": {
     "@modelcontextprotocol/client": "^2.0.0-beta.3",
+    "@modelcontextprotocol/inspector": "^0.22.0",
     "@types/node": "^26.1.1",
     "prettier": "^3.9.5",
     "typescript": "^7.0.2"
