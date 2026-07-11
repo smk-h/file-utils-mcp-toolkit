@@ -15,6 +15,7 @@
     "pack:dry-run": "npm pack --dry-run",
     "pack:tgz": "npm pack",
     "pack:list": "node scripts/pack-list.mjs",
+    "git-sync-force": "node scripts/sync-force.mjs",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "files": [
