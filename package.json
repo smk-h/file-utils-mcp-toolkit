@@ -12,8 +12,17 @@
     "prepare": "npm run build",
     "format:check": "prettier ./src --check",
     "format:fix": "prettier ./src --write",
+    "pack:dry-run": "npm pack --dry-run",
+    "pack:tgz": "npm pack",
+    "pack:list": "node scripts/pack-list.mjs",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "files": [
+    "bin",
+    "out",
+    "README.md",
+    "LICENSE"
+  ],
   "repository": {
     "type": "git",
     "url": "https://cnb.cool/smk.h/file-utils-mcp-toolkit.git"
