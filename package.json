@@ -1,0 +1,31 @@
+{
+  "name": "@smai-kit/file-utils-mcp-toolkit",
+  "version": "0.0.0",
+  "type": "module",
+  "main": "out/index.js",
+  "bin": {
+    "file-utils-mcp-toolkit": "./bin/file-utils-mcp-toolkit-cli.mjs"
+  },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "prepare": "npm run build",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://cnb.cool/smk.h/file-utils-mcp-toolkit.git"
+  },
+  "keywords": [],
+  "author": "sumu",
+  "license": "ISC",
+  "dependencies": {
+    "@modelcontextprotocol/server": "^2.0.0-beta.3",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/client": "^2.0.0-beta.3",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0"
+  }
+}

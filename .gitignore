@@ -1,0 +1,12 @@
+node_modules
+out
+
+!.claude/settings.local.json
+*.log
+
+# npm token — 禁止提交含认证信息的 .npmrc
+.npmrc
+
+*.zip
+*.tar.bz2
+*.tgz
