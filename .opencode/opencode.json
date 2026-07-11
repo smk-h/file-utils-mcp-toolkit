@@ -1,0 +1,15 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": [".claude/CLAUDE.md"],
+  "mcp": {
+    "file-utils": {
+      "type": "local",
+      "command": ["node", "./bin/file-utils-mcp-toolkit-cli.mjs"],
+      "enabled": true,
+      "timeout": 600000,
+      "environment": {
+        "LOG_SAVE": "1"
+      }
+    }
+  }
+}
