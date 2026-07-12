@@ -1,42 +1,26 @@
-import { McpServer } from "@modelcontextprotocol/server";
-import { StdioServerTransport } from "@modelcontextprotocol/server/stdio";
-import * as z from "zod/v4";
+/**
+ * =====================================================
+ * Copyright © sumu. 2022-present. Tech. Co., Ltd. All rights reserved.
+ * File name  : index.ts
+ * Author     : sumu
+ * Date       : 2026/07/12
+ * Description: file-utils-mcp-toolkit 进程入口
+ * ======================================================
+ */
 
-const server = new McpServer({
-    name: "file-utils-mcp-toolkit",
-    version: "0.0.0",
-});
+import { startMcpServer } from "./server.js";
 
-// ─── Tool: 打招呼 ────────────────────────────────────────────────
-
-server.registerTool(
-    "greet",
-    {
-        description: "向指定的人打招呼",
-        inputSchema: z.object({
-            name: z.string().describe("要打招呼的人的名字"),
-        }),
-    },
-    async ({ name }) => {
-        return {
-            content: [
-                {
-                    type: "text",
-                    text: `你好，${name}！欢迎使用 file-utils-mcp-toolkit！`,
-                },
-            ],
-        };
-    }
-);
-
-// ─── 启动 ────────────────────────────────────────────────────────
-
-async function main() {
-    const transport = new StdioServerTransport();
-    await server.connect(transport);
+// ── 启动 ────────────────────────────────────────────────────
+/**
+ * 进程入口：启动 MCP server（stdio 模式，单进程常驻）。
+ * 工具注册在 server.ts 模块加载时完成。
+ */
+async function main(): Promise<void> {
+  await startMcpServer();
 }
 
-main().catch((err) => {
-    console.error("MCP Server 启动失败:", err);
-    process.exit(1);
+main().catch((err: unknown) => {
+  const msg = err instanceof Error ? err.message : String(err);
+  console.error("MCP Server 启动失败:", msg);
+  process.exit(1);
 });
