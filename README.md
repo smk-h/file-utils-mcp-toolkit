@@ -48,7 +48,65 @@ which file-utils-mcp-toolkit       # 应输出 bin 绝对路径
 file-utils-mcp-toolkit              # 启动后等待 stdin，按 Ctrl+C 退出，确认无报错
 ```
 
-### 2. 从源码构建安装
+### 2. 从 GitHub Release 下载离线包安装（跨平台 / 离线环境）
+
+适合**无 npm 访问**的内网 / 离线服务器，或想跳过跨平台 ripgrep / sharp 二进制问题的场景。每次发版（commit message 含 `[release]`）会触发 [GitHub Actions](https://github.com/smk-h/file-utils-mcp-toolkit/actions) 在原生平台 runner 上构建，产出含 `node_modules` + 平台二进制的离线压缩包，挂在 [Releases 页面](https://github.com/smk-h/file-utils-mcp-toolkit/releases)。
+
+#### 2.1 下载对应平台的压缩包
+
+| 平台 | 文件名 |
+|------|--------|
+| Linux x64 | `file-utils-mcp-toolkit-<版本>-linux-x64-offline.tar.gz` |
+| Windows x64 | `file-utils-mcp-toolkit-<版本>-win32-x64-offline.tar.gz` |
+
+> 平台必须匹配：包内 `node_modules/@vscode/ripgrep-{平台}-{架构}/` 与 `node_modules/@img/sharp-{平台}-{架构}/` 的二进制与 OS / 架构绑定，跨平台会启动失败。
+
+#### 2.2 传到目标机器并解压
+
+远端编译场景下，包要装到编译服务器上。先把压缩包传过去：
+
+```bash
+# 本地 → 编译服务器
+scp file-utils-mcp-toolkit-1.0.0-linux-x64-offline.tar.gz sumu@192.168.1.100:~/
+```
+
+在目标机器上解压。压缩包是**扁平结构**——`package.json`、`bin`、`out`、`node_modules` 直接在归档根，没有外层目录。直接 `tar -xzf` 会散落到当前目录，建议先建一个目录再解压进去：
+
+```bash
+mkdir file-utils-mcp-toolkit
+tar -xzf file-utils-mcp-toolkit-1.0.0-linux-x64-offline.tar.gz -C file-utils-mcp-toolkit
+```
+
+#### 2.3 全局安装（跳过编译）
+
+```bash
+npm install -g ./file-utils-mcp-toolkit --ignore-scripts
+```
+
+- `--ignore-scripts` 跳过 `prepare` 钩子（重新跑 `tsc`），因为离线包里 `out/` 已预编译好；
+- 离线包构建时已 `npm prune --omit=dev` 精简掉 devDependencies，`node_modules` 只含运行时依赖 + 目标平台的 ripgrep / sharp 二进制，**全过程不需要联网下载任何东西**。
+
+验证：
+
+```bash
+which file-utils-mcp-toolkit                  # 应输出 bin 绝对路径
+file-utils-mcp-toolkit                          # 启动后等待 stdin，Ctrl+C 退出，确认无报错
+```
+
+#### 2.4 接入配置
+
+装好后用法与第 1 节完全一致——MCP client 通过 SSH 拉起远端 `file-utils-mcp-toolkit` 进程，配置见第四章「远端接入配置」。
+
+#### 2.5 与其他安装方式对比
+
+| 维度 | npm 全局安装 | GitHub 离线包 | 源码构建 |
+|------|-------------|---------------|---------|
+| 需要联网 | 是（访问 npm registry） | 否 | 是（装依赖） |
+| 需要编译 | 否 | 否（预编译 `out/`） | 是（`npm run build`） |
+| 跨平台二进制 | 需 `--os` / `--cpu` 或 `--force` 手动处理 | 原生 runner 预装，开箱即用 | 需手动处理 |
+| 适合场景 | 默认推荐 | 内网 / 离线 / 跨平台分发 | 本地修改 / 调试 |
+
+### 3. 从源码构建安装
 
 适合需要本地修改、或 npm 上没有所需版本时：
 
@@ -72,13 +130,15 @@ npm pack
 npm install -g file-utils-mcp-toolkit-1.0.0.tgz
 ```
 
-### 3. 跨平台部署（ripgrep 二进制）
+### 4. 跨平台部署（ripgrep 二进制）
+
+> 若已用第 2 节的 GitHub 离线包安装，平台二进制由原生 runner 预装，可跳过本节。本节适用于 npm 全局安装或源码构建后需要跨平台分发二进制的场景。
 
 本工具依赖 `@smai-kit/file-utils`，后者通过 `@vscode/ripgrep` 调用 ripgrep。`@vscode/ripgrep` 通过 `require.resolve` 沿目录树查找平台二进制，npm 的依赖提升（hoisting）会将 `@vscode/ripgrep` 及其平台包统一放在顶层 `node_modules/@vscode/` 下。因此即便本工具被其他项目作为依赖集成，消费者安装的是 `@smai-kit/file-utils-mcp-toolkit` 而非 `@smai-kit/file-utils`，ripgrep 的解析机制也不受影响。
 
 跨平台部署场景（如在 macOS 上安装、部署到 Linux 服务器，或 CI/CD 构建后分发到其他平台）需要为目标平台准备对应的 ripgrep 二进制，有两种方式。
 
-#### 3.1 方式一：--force 手动安装（保留本地平台 + 目标平台）
+#### 4.1 方式一：--force 手动安装（保留本地平台 + 目标平台）
 
 ```bash
 # 1. 正常安装本工具（得到当前平台的 ripgrep）
@@ -93,7 +153,7 @@ npm install @vscode/ripgrep-win32-x64@1.18.0 --force --no-save
 
 > 版本对齐：`@vscode/ripgrep-{平台}-{架构}` 的版本必须与实际安装的 `@vscode/ripgrep` 版本一致，否则二进制可能不可用。可通过 `npm ls @vscode/ripgrep` 查看版本。
 
-#### 3.2 方式二：--os / --cpu 指定目标平台（推荐，一次性处理所有平台依赖）
+#### 4.2 方式二：--os / --cpu 指定目标平台（推荐，一次性处理所有平台依赖）
 
 ```bash
 # 部署到 Linux x64 服务器
@@ -107,7 +167,7 @@ npm install @smai-kit/file-utils-mcp-toolkit --os=win32 --cpu=x64
 
 > 注意：使用此方式后，不要再执行任何不带 `--os` / `--cpu` 的 `npm install` 命令，否则 npm 会按当前真实平台重新解析依赖树，移除已安装的目标平台包。需要两个平台共存时请使用方式一。
 
-#### 3.3 安装后的目录结构
+#### 4.3 安装后的目录结构
 
 无论通过哪种方式安装，npm 的依赖提升（hoisting）机制会将所有 `@vscode/*` 包平铺到顶层 `node_modules/@vscode/` 下，与依赖层级深度无关：
 
