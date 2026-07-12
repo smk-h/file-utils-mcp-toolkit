@@ -5,6 +5,7 @@
 .cnb
 .roo
 .vscode
+.github
 
 node_modules
 src

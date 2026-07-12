@@ -1,0 +1,141 @@
+name: Publish Release
+
+# 触发条件：推送到 main/master 且 commit message 含 [release] 标记
+on:
+  push:
+    branches:
+      - main
+      - master
+
+permissions:
+  contents: write # 创建 tag / release 需要
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # ─────────────────────────────────────────────────────────────
+  # 1. 读取版本号并创建草稿 Release（占位，后续 job 上传产物）
+  # ─────────────────────────────────────────────────────────────
+  release:
+    name: Create Draft Release
+    runs-on: ubuntu-latest
+    if: contains(join(github.event.commits.*.message, ' '), '[release]')
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      tag: ${{ steps.meta.outputs.tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Read version from package.json
+        id: meta
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Create draft release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: ${{ steps.meta.outputs.tag }}
+          draft: true
+          prerelease: false
+          generate_release_notes: true
+          body: |
+            ## 产物说明
+
+            | 文件 | 适用场景 |
+            |------|---------|
+            | `*-linux-x64-offline.tar.gz` 等 | 离线包（含 node_modules + 平台二进制），**无网**环境 |
+
+            ### 离线环境（offline 包）
+
+            下载对应平台的 `-offline.tar.gz`，传到目标服务器后：
+
+            ```bash
+            tar -xzf file-utils-mcp-toolkit-${{ steps.meta.outputs.version }}-<平台>-offline.tar.gz
+            npm install -g ./file-utils-mcp-toolkit --ignore-scripts
+            which file-utils-mcp-toolkit  # 验证
+            ```
+
+            > `--ignore-scripts` 用于跳过 `prepare`（重新编译），因为离线包已预编译好 `out/`。
+            > 平台必须匹配：ripgrep / sharp 二进制与 OS/架构绑定。
+
+  # ─────────────────────────────────────────────────────────────
+  # 2. 多平台构建：每个平台用对应 runner 安装原生二进制，最可靠
+  # ─────────────────────────────────────────────────────────────
+  build:
+    name: Build (${{ matrix.target }})
+    needs: release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: linux-x64
+          - os: windows-latest
+            target: win32-x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      - name: Install dependencies (含 dev，用于编译)
+        run: npm install
+
+      - name: Build TypeScript → out/
+        run: npm run build
+
+      - name: Prune devDependencies（精简离线包）
+        run: npm prune --omit=dev
+
+      - name: Verify platform binaries
+        shell: bash
+        run: |
+          echo "== @vscode/ripgrep platform pkg =="
+          ls node_modules/@vscode/ || true
+          echo "== @img/sharp platform pkgs =="
+          ls node_modules/@img/ || true
+
+      # 离线包：package.json + bin + out + node_modules（含平台二进制）
+      - name: Pack offline bundle
+        id: pack
+        shell: bash
+        run: |
+          VERSION="${{ needs.release.outputs.version }}"
+          TARGET="${{ matrix.target }}"
+          ARCHIVE="file-utils-mcp-toolkit-${VERSION}-${TARGET}-offline.tar.gz"
+          # Windows runner 的 tar 为 bsdtar，-czf 跨平台可用
+          tar -czf "$ARCHIVE" package.json bin out node_modules
+          ls -lh "$ARCHIVE"
+          echo "archive=$ARCHIVE" >> "$GITHUB_OUTPUT"
+
+      - name: Upload offline bundle
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ needs.release.outputs.tag }}
+          draft: true
+          files: ${{ steps.pack.outputs.archive }}
+
+  # ─────────────────────────────────────────────────────────────
+  # 3. 全部产物上传完毕，把草稿 Release 正式发布
+  # ─────────────────────────────────────────────────────────────
+  publish:
+    name: Publish Release
+    needs: [release, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mark release as published (undraft)
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ needs.release.outputs.tag }}
+          draft: false
+          make_latest: true
