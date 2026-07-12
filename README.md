@@ -72,6 +72,69 @@ npm pack
 npm install -g file-utils-mcp-toolkit-1.0.0.tgz
 ```
 
+### 3. 跨平台部署（ripgrep 二进制）
+
+本工具依赖 `@smai-kit/file-utils`，后者通过 `@vscode/ripgrep` 调用 ripgrep。`@vscode/ripgrep` 通过 `require.resolve` 沿目录树查找平台二进制，npm 的依赖提升（hoisting）会将 `@vscode/ripgrep` 及其平台包统一放在顶层 `node_modules/@vscode/` 下。因此即便本工具被其他项目作为依赖集成，消费者安装的是 `@smai-kit/file-utils-mcp-toolkit` 而非 `@smai-kit/file-utils`，ripgrep 的解析机制也不受影响。
+
+跨平台部署场景（如在 macOS 上安装、部署到 Linux 服务器，或 CI/CD 构建后分发到其他平台）需要为目标平台准备对应的 ripgrep 二进制，有两种方式。
+
+#### 3.1 方式一：--force 手动安装（保留本地平台 + 目标平台）
+
+```bash
+# 1. 正常安装本工具（得到当前平台的 ripgrep）
+npm install @smai-kit/file-utils-mcp-toolkit
+
+# 2. 强制安装目标平台的 ripgrep（按需选择其一）
+#    部署到 Linux x64 服务器：
+npm install @vscode/ripgrep-linux-x64@1.18.0 --force --no-save
+#    部署到 Windows x64 服务器：
+npm install @vscode/ripgrep-win32-x64@1.18.0 --force --no-save
+```
+
+> 版本对齐：`@vscode/ripgrep-{平台}-{架构}` 的版本必须与实际安装的 `@vscode/ripgrep` 版本一致，否则二进制可能不可用。可通过 `npm ls @vscode/ripgrep` 查看版本。
+
+#### 3.2 方式二：--os / --cpu 指定目标平台（推荐，一次性处理所有平台依赖）
+
+```bash
+# 部署到 Linux x64 服务器
+npm install @smai-kit/file-utils-mcp-toolkit --os=linux --cpu=x64
+
+# 部署到 Windows x64 服务器
+npm install @smai-kit/file-utils-mcp-toolkit --os=win32 --cpu=x64
+```
+
+`--os` / `--cpu` 对整个依赖树生效，不仅安装目标平台的 ripgrep，还会一并安装 sharp 等其他平台相关依赖的目标平台二进制。适合 CI/CD 纯构建场景，无需逐个手动安装平台包，也没有版本对齐问题。
+
+> 注意：使用此方式后，不要再执行任何不带 `--os` / `--cpu` 的 `npm install` 命令，否则 npm 会按当前真实平台重新解析依赖树，移除已安装的目标平台包。需要两个平台共存时请使用方式一。
+
+#### 3.3 安装后的目录结构
+
+无论通过哪种方式安装，npm 的依赖提升（hoisting）机制会将所有 `@vscode/*` 包平铺到顶层 `node_modules/@vscode/` 下，与依赖层级深度无关：
+
+```
+node_modules/
+├── @smai-kit/
+│   ├── file-utils-mcp-toolkit/        ← 消费者直接安装的上层包
+│   └── file-utils/                    ← hoisted 传递依赖
+│       └── out/utils/ripgrep.js       ← import { rgPath } from "@vscode/ripgrep"
+│
+├── @vscode/                           ← 所有 @vscode/* 都 hoisted 到这一层
+│   ├── ripgrep/                       ← 主包（JS 包装代码）
+│   │   └── lib/index.js               ← require.resolve("@vscode/ripgrep-{平台}-{架构}/bin/rg")
+│   ├── ripgrep-linux-x64/             ← 当前平台，npm 自动安装
+│   │   └── bin/rg
+│   └── ripgrep-win32-x64/             ← --force 手动安装（或 --os 指定的目标平台）
+│       └── bin/rg.exe
+│
+├── @img/                              ← sharp 的平台包，同样 hoisted
+│   ├── sharp-linux-x64/
+│   └── sharp-libvips-linux-x64/
+├── sharp/
+└── ... 其他依赖
+```
+
+`@vscode/ripgrep/lib/index.js` 中的 `require.resolve` 从自身位置向上查找，在 `node_modules/@vscode/` 这一层找到同级的 `ripgrep-{平台}-{架构}/bin/rg`。因此不管依赖链多深（`file-utils-mcp-toolkit` → `@smai-kit/file-utils` → `@vscode/ripgrep`），只要平台包存在于顶层 `node_modules/@vscode/` 下即可被正确解析。
+
 > 关键：无论哪种安装方式，运行时必须保持**单进程常驻**。库的 staleness 校验依赖进程内 `readFileState`（模块级 `Map`），进程间不共享状态，详见 [`docs/remote-file-mcp.md`](docs/remote-file-mcp.md) 第四章第 5.3 节。stdio 模式天然满足这一约束。
 
 ## 四、 远端接入配置
