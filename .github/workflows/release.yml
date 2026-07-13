@@ -27,7 +27,7 @@ jobs:
       tag: ${{ steps.meta.outputs.tag }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Read version from package.json
         id: meta
@@ -57,11 +57,11 @@ jobs:
 
             ```bash
             tar -xzf file-utils-mcp-toolkit-${{ steps.meta.outputs.version }}-<平台>-offline.tar.gz
-            npm install -g ./file-utils-mcp-toolkit --ignore-scripts
+            bash offline_install.sh
             which file-utils-mcp-toolkit  # 验证
             ```
 
-            > `--ignore-scripts` 用于跳过 `prepare`（重新编译），因为离线包已预编译好 `out/`。
+            > 离线包已预编译 `out/`，`offline_install.sh` 复刻 `npm install -g` 两步（复制包 + 建 bin shim），不触发 `prepare`、绕开 npm 版本差异。
             > 平台必须匹配：ripgrep / sharp 二进制与 OS/架构绑定。
 
   # ─────────────────────────────────────────────────────────────
@@ -81,10 +81,10 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: lts/*
 
