@@ -113,8 +113,10 @@ jobs:
           VERSION="${{ needs.release.outputs.version }}"
           TARGET="${{ matrix.target }}"
           ARCHIVE="file-utils-mcp-toolkit-${VERSION}-${TARGET}-offline.tar.gz"
+          # 把安装脚本放进包根，解压后 bash offline_install.sh 即可装，绕开 npm prepare / 版本差异
+          cp scripts/offline_install.sh offline_install.sh
           # Windows runner 的 tar 为 bsdtar，-czf 跨平台可用
-          tar -czf "$ARCHIVE" package.json bin out node_modules
+          tar -czf "$ARCHIVE" package.json bin out node_modules offline_install.sh
           ls -lh "$ARCHIVE"
           echo "archive=$ARCHIVE" >> "$GITHUB_OUTPUT"
 

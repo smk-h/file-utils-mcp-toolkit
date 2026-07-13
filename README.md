@@ -77,14 +77,25 @@ mkdir file-utils-mcp-toolkit
 tar -xzf file-utils-mcp-toolkit-1.0.0-linux-x64-offline.tar.gz -C file-utils-mcp-toolkit
 ```
 
-#### 2.3 全局安装（跳过编译）
+#### 2.3 全局安装
+
+离线包根目录自带 `offline_install.sh`，直接运行即可把包装到全局 npm 目录。它复刻 `npm install -g` 的两步（复制包到 `node_modules` + 建 bin shim），但**不触发 `prepare`、不依赖 `--ignore-scripts`**，从根上绕开 npm 版本差异导致的 `tsc: not found`：
 
 ```bash
-npm install -g ./file-utils-mcp-toolkit --ignore-scripts
+bash offline_install.sh
 ```
 
-- `--ignore-scripts` 跳过 `prepare` 钩子（重新跑 `tsc`），因为离线包里 `out/` 已预编译好；
-- 离线包构建时已 `npm prune --omit=dev` 精简掉 devDependencies，`node_modules` 只含运行时依赖 + 目标平台的 ripgrep / sharp 二进制，**全过程不需要联网下载任何东西**。
+脚本做的事：
+
+1. 把 `package.json` / `bin` / `out` / `node_modules` 复制到 `$(npm root -g)/@smai-kit/file-utils-mcp-toolkit/`；
+2. 在 `$(npm prefix -g)/bin/` 创建 `file-utils-mcp-toolkit` 包装脚本，用 `node` 调起 `cli.mjs`；
+3. `which file-utils-mcp-toolkit` 验证。
+
+离线包构建时已 `npm prune --omit=dev` 精简掉 devDependencies，`node_modules` 只含运行时依赖 + 目标平台的 ripgrep / sharp 二进制，**全过程不需要联网下载任何东西**。
+
+> 权限：`npm prefix -g` 不可写时（系统级 npm 装在 `/usr/local`），用 `sudo bash offline_install.sh`；nvm 装在用户目录则直接跑。
+>
+> Windows：`offline_install.sh` 是 Unix 脚本，Windows 暂用 `npm install -g ./file-utils-mcp-toolkit --ignore-scripts`（npm 11.x 可直接装；npm 10.x 若报 `tsc: not found`，先 `(cd file-utils-mcp-toolkit && npm pkg delete scripts.prepare)` 删 prepare 再装）。
 
 验证：
 
@@ -92,6 +103,8 @@ npm install -g ./file-utils-mcp-toolkit --ignore-scripts
 which file-utils-mcp-toolkit                  # 应输出 bin 绝对路径
 file-utils-mcp-toolkit                          # 启动后等待 stdin，Ctrl+C 退出，确认无报错
 ```
+
+> 安装结果与 `npm install -g` 等价，可用 `npm uninstall -g @smai-kit/file-utils-mcp-toolkit` 正常卸载。
 
 #### 2.4 接入配置
 
